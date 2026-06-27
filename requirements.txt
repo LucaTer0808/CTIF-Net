@@ -1,2 +1,6 @@
-torch==1.8.1
-timm==1.0.3
+torch
+timm
+torchvision
+numpy
+PIL
+
