@@ -43,6 +43,7 @@ start_time = time.time()
 
 with torch.no_grad():
     for i in range(test_loader.size):
+        print(f'Processing image {i + 1}/{test_loader.size}')
         image_tran, gt, orignin_image, name = test_loader.load_data()
         gt = np.asarray(gt, np.float32)
         gt /= (gt.max() + 1e-8)
