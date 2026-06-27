@@ -12,83 +12,63 @@ from model.CTIFNet import CTIFNet
 import os, argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--testsize', type=int, default=224, help='test size')
-parser.add_argument('--trainset', type=str, default='DUTS-TR', help='training  dataset')
-parser.add_argument('--mae_model_path', type=str, default='./models/checkpoint/mae_pretrain_vit_large.pth', help='mae pretrain model path')
-parser.add_argument('--pre_model_path', type=str, default='./models/CTIFNet_w_.pth', help='pre-trained model path')
-parser.add_argument('--dataset_path', type=str, default='./data/TestDatasets', help='test dataset path')
-parser.add_argument('--test_datasets', nargs='+', type=str, default=['DUTS-TE', 'DUT-OMRON', 'ECSSD', 'HKU-IS', 'PASCAL-S'], help='List of test datasets')
+parser.add_argument('--source', type=str, help='source dataset path')
+parser.add_argument('--gt', type=str, help='ground truth dataset path')
+parser.add_argument('--target', type=str, help='target dataset path')
 
 args = parser.parse_args()
-print("====================config file is >>>>>>>> "+str(args))
+args.testsize = 224
+args.trainset = 'DUTS-TR'
+args.pre_model_path = './models/CTIFNet.pth'
+args.mae_model_path = './models/checkpoint/mae_pretrain_vit_large.pth'
 
-print("Test datasets {} begin!".format(args.test_datasets))
+image_path = args.source if args.source.endswith('/') else args.source + '/'
+gt_path = args.gt if args.gt.endswith('/') else args.gt + '/'
+target_path = args.target if args.target.endswith('/') else args.target + '/'
+eval_path = target_path + 'evaluation.txt'
 
 model = CTIFNet(args)
 model.cuda()
 
 model.load_state_dict(torch.load(args.pre_model_path))
 print("====== load model from {} success! ======".format(args.pre_model_path))
-result_file_name="saliency_preds"
 
+test_loader = test_dataset(image_path, gt_path, args.testsize)
+model.eval()
 
-for i, dataset in enumerate(args.test_datasets):
+os.makedirs(target_path, exist_ok=True)
 
-    startTime = time.time()
-    print("test NO:{} datasets {} begin test!".format(i,dataset))
-    path_prefix = './'+result_file_name+'/'
-    pre_image_merge_save_path = path_prefix + dataset + '/'
-    os.makedirs(pre_image_merge_save_path,exist_ok=True)
-    image_root = os.path.join(args.dataset_path, dataset)
+torch.cuda.synchronize()
+start_time = time.time()
 
-    if dataset == "ECSSD" or dataset =="PASCAL-S":
-        image_path = image_root + "/Imgs/"
-        gt_path = image_path
-    elif dataset == "DUTS-TE":
-        image_path = image_root + "/DUTS-TE-Image/"
-        gt_path = image_root + "/DUTS-TE-Mask/"
-    elif dataset == "DUTS-TR":
-        image_path = image_root + "/DUTS-TR-Image/"
-        gt_path = image_root + "/DUTS-TR-Mask/"
-    elif dataset == "DUTS-TR":
-        image_path = image_root + "/DUTS-TR-Image/"
-        gt_path = image_root + "/DUTS-TR-Mask/"
-    else:
-        image_path = image_root + "/Img/"
-        gt_path = image_root + "/GT/"
-
-    test_loader = test_dataset(image_path, gt_path, args.testsize, dataset)
-    total_test_time =0
-    total_time =0
-    model.eval()
+with torch.no_grad():
     for i in range(test_loader.size):
         image_tran, gt, orignin_image, name = test_loader.load_data()
         gt = np.asarray(gt, np.float32)
         gt /= (gt.max() + 1e-8)
         image = Variable(image_tran).cuda()
-        begin_time = time.time()
         result_res, result_trans = model(image)
-        test_end_time = time.time()
-        total_test_time +=(test_end_time-begin_time)
 
-        result_res = F.interpolate(result_res, size=gt.shape, mode='bilinear', align_corners=False)
-        result_trans = F.interpolate(result_trans, size=gt.shape, mode='bilinear', align_corners=False)
-        temp_name = name.split('.png')[0]
+        result_res = F.interpolate(result_res, size=gt.shape[:2], mode='bilinear', align_corners=False)
+        result_trans = F.interpolate(result_trans, size=gt.shape[:2], mode='bilinear', align_corners=False)
+        temp_name, _ = os.path.splitext(name)
         transform = transforms.Compose([
             transforms.ToTensor(),  # range [0, 255] -> [0.0,1.0]
-        ]
-        )
+        ])
 
-        vutils.save_image(result_res, pre_image_merge_save_path + temp_name + ".png")
+        vutils.save_image(result_res, target_path + temp_name + ".png")
 
+torch.cuda.synchronize()
+end_time = time.time()
 
-        save_end_time = time.time()
-        total_time += (save_end_time-begin_time)
+total_time = end_time - start_time
+images_processed = test_loader.size
+average_time_per_image = total_time / images_processed if images_processed > 0 else 0
 
-
-    print(" ave_test_time is {:.4f} s  total_test_time is {:.4f} s".format(total_test_time/test_loader.size,total_test_time))
-    print("total_time is {} s ".format(total_time))
-    print("Test  dataset {} [Cost:{:.4f}s] finished! ".format(dataset,(time.time()-startTime)))
+with open(eval_path, 'w') as f:
+    f.write(f"Total time: {total_time:.4f} seconds\n")
+    f.write(f"Images processed: {images_processed}\n")
+    f.write(f"Average time per image: {average_time_per_image:.4f} seconds\n")
 
 
 
