@@ -48,12 +48,13 @@ with torch.no_grad():
         gt /= (gt.max() + 1e-8)
         image = Variable(image_tran).cuda()
         result_res, result_trans = model(image)
+        result_res = torch.sigmoid(result_res)
 
         result_res = F.interpolate(result_res, size=gt.shape[:2], mode='bilinear', align_corners=False)
         result_trans = F.interpolate(result_trans, size=gt.shape[:2], mode='bilinear', align_corners=False)
         temp_name, _ = os.path.splitext(name)
 
-        vutils.save_image(result_res, target_path + temp_name + ".png")
+        vutils.save_image(result_res, target_path + temp_name + ".png", normalize=True)
 
 torch.cuda.synchronize()
 end_time = time.time()
