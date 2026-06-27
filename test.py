@@ -8,7 +8,7 @@ from torch.autograd import Variable
 from evaluate.data import test_dataset
 import time
 import torchvision.transforms as transforms
-from model.CTIFNet import  CTIFNet
+from model.CTIFNet import CTIFNet
 import os, argparse
 
 parser = argparse.ArgumentParser()
