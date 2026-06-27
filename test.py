@@ -52,9 +52,6 @@ with torch.no_grad():
         result_res = F.interpolate(result_res, size=gt.shape[:2], mode='bilinear', align_corners=False)
         result_trans = F.interpolate(result_trans, size=gt.shape[:2], mode='bilinear', align_corners=False)
         temp_name, _ = os.path.splitext(name)
-        transform = transforms.Compose([
-            transforms.ToTensor(),  # range [0, 255] -> [0.0,1.0]
-        ])
 
         vutils.save_image(result_res, target_path + temp_name + ".png")
 
