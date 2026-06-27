@@ -2,4 +2,4 @@ torch
 timm
 torchvision
 numpy
-PIL
+Pillow
